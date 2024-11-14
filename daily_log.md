@@ -4,3 +4,9 @@
 - **Problem Code**: E
 - [Problem Link](https://codeforces.com/problemset/problem/2032/E)
 
+### 2024-11-14|08:44:51
+- **Platform**: Codeforces
+- **Contest Code**: 2032
+- **Problem Code**: F
+- [Problem Link](https://codeforces.com/problemset/problem/2032/F)
+
