@@ -59,7 +59,7 @@ def extract_codes_from_link(link, platform):
 # Function to update the daily log
 def update_daily_log(platform, contest_code, problem_code, problem_link):
     log_filename = "daily_log.md"  # Define your log file name here
-    date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    date_str = datetime.now().strftime("%Y-%m-%d|%H:%M:%S")
     
     log_entry = f"### {date_str}\n- **Platform**: {platform}\n- **Contest Code**: {contest_code}\n- **Problem Code**: {problem_code}\n- [Problem Link]({problem_link})\n\n"
     
