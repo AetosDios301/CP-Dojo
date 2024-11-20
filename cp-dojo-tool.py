@@ -32,10 +32,22 @@ class CPDojoConfig:
     }
     
     PLATFORM_REGEX = {
-        "Codeforces": r"/problemset/problem/(\d+)/([A-Za-z0-9]+)",
-        "Leetcode": r"/problems/([a-z0-9-]+)/",
-        "CodeChef": r"/([A-Z0-9]+)/problems/([A-Z0-9]+)",
-        "AtCoder": r"/contests/([a-z0-9]+)/tasks/([a-z0-9_]+)"
+        "Codeforces": {
+            "pattern": r"codeforces\.com/(?:contest|group|problemset/problem)/([^/]+)/(?:problem/)?([A-Za-z0-9]+)",
+            "extract": lambda match: (match.group(1), match.group(2))  # Returns (contest_id/problem_number, problem_code)
+        },
+        "Leetcode": {
+            "pattern": r"leetcode\.com/(?:problems|contest)/([a-zA-Z0-9-]+)(?:/problems/([a-zA-Z0-9-]+))?",
+            "extract": lambda match: ("leetcode", match.group(2) if match.group(2) else match.group(1))
+        },
+        "CodeChef": {
+            "pattern": r"codechef\.com/(?:[^/]+/)?(?:problems/)?([A-Z0-9]+)",
+            "extract": lambda match: ("codechef", match.group(1))
+        },
+        "AtCoder": {
+            "pattern": r"atcoder\.jp/contests/([^/]+)/tasks/([^/]+)",
+            "extract": lambda match: (match.group(1), match.group(2).split('_')[-1])
+        }
     }
     
     BASE_DIR = Path("My-CP-Dojo")
@@ -43,12 +55,66 @@ class CPDojoConfig:
 
 class CPDojoTemplate:
     @staticmethod
+    def generate_metadata_comment(problem_info: ProblemInfo, language: str) -> str:
+        tags = ", ".join(problem_info.tags) if problem_info.tags else "None"
+        created_date = problem_info.created_date.strftime('%Y-%m-%d %H:%M:%S') if problem_info.created_date else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        comment_styles = {
+            "Python": {
+                "start": "# ",
+                "multi_start": "'''",
+                "multi_end": "'''"
+            },
+            "C++": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            },
+            "Java": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            },
+            "JavaScript": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            },
+            "Go": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            },
+            "Kotlin": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            },
+            "Rust": {
+                "start": "// ",
+                "multi_start": "/*",
+                "multi_end": "*/"
+            }
+        }
+
+        style = comment_styles.get(language, comment_styles["Python"])
+        
+        return f"""{style['multi_start']}
+Problem Code: {problem_info.problem_code}
+Platform: {problem_info.platform}
+Contest Code: {problem_info.contest_code}
+Link: {problem_info.problem_link}
+Difficulty: {problem_info.difficulty or 'Unknown'}
+Tags: {tags}
+Created: {created_date}
+{style['multi_end']}
+"""
+
+    @staticmethod
     def get_language_template(language: str, problem_info: ProblemInfo) -> str:
+        metadata = CPDojoTemplate.generate_metadata_comment(problem_info, language)
         templates = {
-            "Python": f"""# Problem: {problem_info.problem_code}
-# Platform: {problem_info.platform}
-# Link: {problem_info.problem_link}
-# Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            "Python": f"""{metadata}
 
 def solve():
     # TODO: Implement your solution here
@@ -58,17 +124,12 @@ def main():
     # Read input
     T = int(input())  # Number of test cases
     for _ in range(T):
-        # Process each test case
         solve()
 
 if __name__ == "__main__":
-    main()
-""",
-            "C++": f"""// Problem: {problem_info.problem_code}
-// Platform: {problem_info.platform}
-// Link: {problem_info.problem_link}
-// Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
+    main()""",
+            
+            "C++": f"""{metadata}
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -80,17 +141,16 @@ int main() {{
     ios::sync_with_stdio(0);
     cin.tie(0);
     
-    int t;
-    cin >> t;
-    while(t--) {{
+    int T;
+    cin >> T;
+    while(T--) {{
         solve();
     }}
     return 0;
-}}
-""",
-            # Add templates for other languages...
+}}"""
+            # Add other language templates as needed
         }
-        return templates.get(language, f"// Problem: {problem_info.problem_code}\n// Link: {problem_info.problem_link}\n")
+        return templates.get(language, "")
 
 class CPDojoTool:
     def __init__(self):
@@ -146,18 +206,15 @@ class CPDojoTool:
                 print("Invalid input. Please enter a number.")
 
     def extract_codes_from_link(self, link: str, platform: str) -> Tuple[str, str]:
-        if platform not in CPDojoConfig.PLATFORM_REGEX:
-            self.logger.error(f"Unsupported platform: {platform}")
-            return "unknown", "unknown"
-            
-        match = re.search(CPDojoConfig.PLATFORM_REGEX[platform], link)
+        platform_info = CPDojoConfig.PLATFORM_REGEX.get(platform)
+        if not platform_info:
+            raise ValueError(f"Unsupported platform: {platform}")
+        
+        match = re.search(platform_info["pattern"], link)
         if not match:
-            self.logger.error(f"Could not extract codes from link: {link}")
-            return "unknown", "unknown"
-            
-        if platform == "Leetcode":
-            return "leetcode", match.group(1).replace("-", "_")
-        return match.group(1), match.group(2)
+            raise ValueError(f"Could not extract codes from link: {link}")
+        
+        return platform_info["extract"](match)
 
     def update_daily_log(self, problem_info: ProblemInfo):
         log_path = CPDojoConfig.BASE_DIR / "daily_log.md"
@@ -190,46 +247,41 @@ class CPDojoTool:
             
         return dirs
 
+    @staticmethod
+    def generate_filename(problem_info: ProblemInfo, language: str, file_type: str = "solution") -> str:
+        """Generate consistent filename for different file types."""
+        platform_id = problem_info.platform.lower()
+        contest_id = problem_info.contest_code.lower()
+        problem_id = problem_info.problem_code
+        
+        if file_type == "solution":
+            return f"{platform_id}_{contest_id}_{problem_id}{CPDojoConfig.LANGUAGES[language]}"
+        elif file_type == "thought":
+            return f"{platform_id}_{contest_id}_{problem_id}.md"
+        elif file_type == "link":
+            return f"{platform_id}_{contest_id}_{problem_id}.txt"
+        
+        raise ValueError(f"Unknown file type: {file_type}")
+
     def create_problem_files(self, problem_info: ProblemInfo, language: str, directories: Dict[str, Path]):
-        # Solution file with template
-        solution_file = directories['solutions'] / f"solution-{problem_info.contest_code}_{problem_info.problem_code}{CPDojoConfig.LANGUAGES[language]}"
-        solution_file.write_text(CPDojoTemplate.get_language_template(language, problem_info))
-        
-        # Question link file
-        question_file = directories['questions'] / f"{problem_info.contest_code}_{problem_info.problem_code}.txt"
-        question_file.write_text(problem_info.problem_link)
-        
-        # Thought process template
-        thought_file = directories['thought_process'] / f"{problem_info.contest_code}_{problem_info.problem_code}.md"
-        thought_template = f"""# Problem Analysis: {problem_info.problem_code}
+        # Generate solution file
+        solution_filename = self.generate_filename(problem_info, language, "solution")
+        solution_file = directories['solutions'] / solution_filename
+        solution_template = CPDojoTemplate.get_language_template(language, problem_info)
+        solution_file.write_text(solution_template)
 
-## Problem Link
-{problem_info.problem_link}
+        # Generate link file
+        link_filename = self.generate_filename(problem_info, language, "link")
+        link_file = directories['solutions'] / link_filename
+        link_file.write_text(problem_info.problem_link)
 
-## Initial Thoughts
-- What are the key constraints?
-- What's the input size?
-- Any edge cases to consider?
-
-## Approach
-1. First approach considerations
-   - Time complexity:
-   - Space complexity:
-
-## Implementation Details
-- Key data structures used:
-- Important algorithms/techniques:
-
-## Learning Points
-- What did you learn from this problem?
-- Any particular tricks or patterns worth remembering?
-
-## Similar Problems
-- List similar problems you've solved
-"""
+        # Generate thought process file
+        thought_filename = self.generate_filename(problem_info, language, "thought")
+        thought_file = directories['thought_process'] / thought_filename
+        thought_template = self._get_thought_template(problem_info)
         thought_file.write_text(thought_template)
-        
-        self.logger.info(f"Created files for problem {problem_info.problem_code}")
+
+        return solution_filename, link_filename, thought_filename
 
     def open_vscode(self, directory: Path):
         try:
@@ -256,6 +308,33 @@ class CPDojoTool:
                 datetime.now().isoformat()
             ))
 
+    def _get_thought_template(self, problem_info: ProblemInfo) -> str:
+        """Generate template for documenting thought process."""
+        return f"""# {problem_info.platform} - Problem {problem_info.problem_code}
+
+## Problem Link
+{problem_info.problem_link}
+
+## Initial Thoughts
+- [ ] First approach
+- [ ] Edge cases to consider
+- [ ] Possible optimizations
+
+## Approach
+1. Describe your approach here
+
+## Complexity Analysis
+- Time Complexity: 
+- Space Complexity: 
+
+## Key Learnings
+- What did you learn from this problem?
+- Any specific techniques or patterns used?
+
+## Tags
+{', '.join(problem_info.tags) if problem_info.tags else 'None'}
+"""
+
     def run(self):
         self.clear_screen()
         print("Welcome to My-CP-Dojo CLI Tool!")
@@ -270,10 +349,10 @@ class CPDojoTool:
             return
 
         # Optional metadata
-        difficulty = input("Enter problem difficulty (optional): ").strip() or None
-        tags = input("Enter problem tags (comma-separated, optional): ").strip()
-        tags = [tag.strip() for tag in tags.split(",")] if tags else []
-        
+        difficulty = input("Enter problem difficulty (optional): ").strip()
+        tags_input = input("Enter problem tags (comma-separated, optional): ").strip()
+        tags = [tag.strip() for tag in tags_input.split(',')] if tags_input else []
+
         problem_info = ProblemInfo(
             platform=platform,
             contest_code=contest_code,
@@ -285,16 +364,16 @@ class CPDojoTool:
         )
         
         directories = self.create_problem_directories(problem_info, language)
-        self.create_problem_files(problem_info, language, directories)
+        solution_file, link_file, thought_file = self.create_problem_files(problem_info, language, directories)
         self.update_daily_log(problem_info)
         self.store_problem_info(problem_info)
         self.open_vscode(directories['solutions'])
         
         print(f"\nSetup complete! Files created in {directories['solutions']}")
         print("\nCreated files:")
-        print(f"1. Solution template: solution-{problem_code}{CPDojoConfig.LANGUAGES[language]}")
-        print(f"2. Problem link: {problem_code}.txt")
-        print(f"3. Thought process template: {problem_code}.md")
+        print(f"1. Solution template: {solution_file}")
+        print(f"2. Problem link: {link_file}")
+        print(f"3. Thought process: {thought_file}")
         print("\nYou can now start solving the problem in VSCode!")
 
 if __name__ == "__main__":

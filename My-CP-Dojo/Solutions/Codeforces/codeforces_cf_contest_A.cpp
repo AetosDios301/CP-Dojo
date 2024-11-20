@@ -1,11 +1,11 @@
 /*
-Problem Code: O
+Problem Code: A
 Platform: Codeforces
-Contest Code: 219774
-Link: https://codeforces.com/group/MWSDmqGsZm/contest/219774/problem/O
+Contest Code: cf_contest
+Link: https://codeforces.com/problemset/problem/2036/A
 Difficulty: Unknown
 Tags: None
-Created: 2024-11-14 21:39:56
+Created: 2024-11-20 18:18:44
 */
 
 #include <bits/stdc++.h>

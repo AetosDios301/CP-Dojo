@@ -1,7 +1,7 @@
-# Problem Analysis: O
+# Problem Analysis: M
 
 ## Problem Link
-https://codeforces.com/group/MWSDmqGsZm/contest/219774/problem/O
+https://codeforces.com/problemset/problem/2038/M
 
 ## Initial Thoughts
 - What are the key constraints?
